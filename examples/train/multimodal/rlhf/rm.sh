@@ -1,3 +1,6 @@
+export MODELSCOPE_CACHE="/c22940/zy/cache"
+
+
 # 4 * 50GiB
 nproc_per_node=4
 
@@ -8,7 +11,7 @@ MAX_PIXELS=1003520 \
 swift rlhf \
     --rlhf_type rm \
     --model /c22940/zy/model/Qwen2.5-VL-7B-Instruct \
-    --dataset 'swift/RLAIF-V-Dataset#20000' \
+    --dataset /c22940/zy/code/ms-swift/code2image.jsonl \
     --train_type full \
     --torch_dtype bfloat16 \
     --num_train_epochs 1 \
@@ -20,11 +23,11 @@ swift rlhf \
     --eval_steps 100 \
     --save_steps 100 \
     --save_total_limit 2 \
-    --deepspeed zero3 \
+    --deepspeed zero2 \
     --logging_steps 5 \
     --max_length 4096 \
     --output_dir output \
     --warmup_ratio 0.05 \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers 0 \
     --dataset_num_proc 4 \
     --save_only_model true

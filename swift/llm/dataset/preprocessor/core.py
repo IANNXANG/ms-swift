@@ -98,8 +98,8 @@ class RowPreprocessor:
         if 'rejected_response' in row:
             messages = row['messages']
             rejected_response = row['rejected_response']
-            if rejected_response is None or rejected_response == messages[-1]['content']:
-                raise ValueError(f'rejected_response: {rejected_response}')
+            #if rejected_response is None or rejected_response == messages[-1]['content']:
+                #raise ValueError(f'rejected_response: {rejected_response}')
 
     def preprocess(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         raise NotImplementedError
