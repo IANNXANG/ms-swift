@@ -151,4 +151,3 @@ megatron_output/
 ast_index_file.py
 
 image_data/
-code2image.jsonl

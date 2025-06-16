@@ -1,13 +1,12 @@
 export MODELSCOPE_CACHE="/c22940/zy/cache"
-
-
+export WANDB_MODE=offline
+export CUDA_VISIBLE_DEVICES=2,3,4,5
 # 4 * 50GiB
 nproc_per_node=4
 
 PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' \
-CUDA_VISIBLE_DEVICES=2,3,4,5 \
 NPROC_PER_NODE=$nproc_per_node \
-MAX_PIXELS=1003520 \
+MAX_PIXELS=12845056 \
 swift rlhf \
     --rlhf_type rm \
     --model /c22940/zy/model/Qwen2.5-VL-7B-Instruct \
@@ -25,9 +24,10 @@ swift rlhf \
     --save_total_limit 2 \
     --deepspeed zero2 \
     --logging_steps 5 \
-    --max_length 4096 \
+    --max_length 8192 \
     --output_dir output \
     --warmup_ratio 0.05 \
     --dataloader_num_workers 0 \
     --dataset_num_proc 4 \
+    --report_to wandb \
     --save_only_model true

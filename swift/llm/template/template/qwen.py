@@ -246,7 +246,7 @@ class Qwen2VLTemplate(Template):
                 if media_type == 'images':
                     media_token = self.image_token_id
                     media_inputs = processor.image_processor(
-                        images=images, videos=None, return_tensors='pt', do_resize=False)
+                        images=images, videos=None, return_tensors='pt', do_resize=True)
                     media_grid_thw = media_inputs['image_grid_thw']
                 else:
                     if hasattr(processor, 'video_processor'):
