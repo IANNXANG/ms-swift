@@ -1,12 +1,16 @@
 export MODELSCOPE_CACHE="/c22940/zy/cache"
 export WANDB_MODE=offline
 export CUDA_VISIBLE_DEVICES=2,3,4,5
+export MAX_PIXELS=12845056
+export MIN_PIXELS=3136
+export IMAGE_FACTOR=28
 # 4 * 50GiB
 nproc_per_node=4
 
+
+#'swift/RLAIF-V-Dataset#20000'    /c22940/zy/code/ms-swift/code2image.jsonl
 PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' \
 NPROC_PER_NODE=$nproc_per_node \
-MAX_PIXELS=12845056 \
 swift rlhf \
     --rlhf_type rm \
     --model /c22940/zy/model/Qwen2.5-VL-7B-Instruct \
