@@ -28,7 +28,7 @@ swift rlhf \
     --save_total_limit 2 \
     --deepspeed zero2 \
     --logging_steps 5 \
-    --max_length 8192 \
+    --max_length 32768 \
     --output_dir output \
     --warmup_ratio 0.05 \
     --dataloader_num_workers 0 \

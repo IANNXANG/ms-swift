@@ -316,10 +316,71 @@ class Template(ProcessorMixin):
         else:
             return model
 
+    def _split_rlhf_images(self, chosen_inputs: StdTemplateInputs, rejected_inputs: StdTemplateInputs) -> None:
+        """
+        智能分配图片资源给RLHF的chosen和rejected分支
+        
+        逻辑：
+        1. 统计chosen response和rejected response中的<image>标签数量
+        2. 从原始images列表中按顺序分配图片
+        3. chosen分支获得前N张图片，rejected分支获得后M张图片
+        """
+        import re
+        
+        # 获取chosen response中的<image>标签数量
+        chosen_response = chosen_inputs.messages[-1]['content'] or ''
+        chosen_image_count = len(re.findall(r'<image>', chosen_response))
+        
+        # 获取rejected response中的<image>标签数量  
+        rejected_response = rejected_inputs.messages[-1]['content'] or ''
+        rejected_image_count = len(re.findall(r'<image>', rejected_response))
+        
+        # 获取messages中其他位置的<image>标签数量（除了最后一个assistant消息）
+        other_messages_content = ''
+        for i, msg in enumerate(chosen_inputs.messages[:-1]):  # 排除最后一个消息
+            other_messages_content += msg['content'] or ''
+        other_image_count = len(re.findall(r'<image>', other_messages_content))
+        
+        total_images = len(chosen_inputs.images or [])
+        total_needed = other_image_count + chosen_image_count + rejected_image_count
+        
+        # 验证图片数量
+        if total_needed > total_images:
+            get_logger().warning(
+                f'RLHF图片分配警告: 需要{total_needed}张图片 '
+                f'(其他位置:{other_image_count}, chosen:{chosen_image_count}, rejected:{rejected_image_count}), '
+                f'但只有{total_images}张图片可用'
+            )
+        
+        # 分配图片
+        if chosen_inputs.images:
+            original_images = chosen_inputs.images.copy()  # 保存原始图片列表
+            
+            # chosen分支：其他位置的图片 + chosen response的图片
+            chosen_end_idx = other_image_count + chosen_image_count
+            chosen_inputs.images = original_images[:chosen_end_idx]
+            
+            # rejected分支：其他位置的图片 + rejected response的图片  
+            rejected_start_idx = other_image_count + chosen_image_count
+            rejected_end_idx = rejected_start_idx + rejected_image_count
+            rejected_images = (original_images[:other_image_count] + 
+                             original_images[rejected_start_idx:rejected_end_idx])
+            rejected_inputs.images = rejected_images
+            
+            get_logger().info(
+                f'\nRLHF图片分配详情:\n'
+                f'chosen分支({len(chosen_inputs.images)}张): {chosen_inputs.images}\n'
+                f'rejected分支({len(rejected_inputs.images)}张): {rejected_inputs.images}'
+            )
+
     def _rlhf_encode(self, inputs: StdTemplateInputs) -> Dict[str, Any]:
         chosen_inputs, rejected_inputs = inputs, deepcopy(inputs)
         assert chosen_inputs.rejected_response is not None, f'inputs: {inputs}'
         rejected_inputs.messages[-1]['content'] = chosen_inputs.rejected_response
+        
+        # 智能分配图片资源给chosen和rejected分支
+        self._split_rlhf_images(chosen_inputs, rejected_inputs)
+        
         chosen_encoded = self._encode_truncated(chosen_inputs)
         rejected_encoded = self._encode_truncated(rejected_inputs)
 
@@ -806,16 +867,22 @@ class Template(ProcessorMixin):
             res_loss_scale += [loss_scale] * len(c_list)
         return res, res_loss_scale
 
-    @staticmethod
-    def _add_default_tags(inputs: StdTemplateInputs):
+    def _add_default_tags(self, inputs: StdTemplateInputs):
+        # 在RLHF模式下，跳过自动添加标签逻辑，因为图片分配会在_split_rlhf_images中处理
+        if self.mode == 'rlhf':
+            return
+            
         total_content = '\n'.join([message['content'] or '' for message in inputs.messages])
+        
         if inputs.rejected_response:
             if isinstance(inputs.rejected_response, str):
                 total_content += inputs.rejected_response
             else:
                 total_content += '\n'.join(inputs.rejected_response)
+                
         if inputs.system:
             total_content = f'{inputs.system}\n{total_content}'
+            
         for media_type in ['image', 'audio', 'video']:
             media_key, media_tag = f'{media_type}s', f'<{media_type}>'
             medias = getattr(inputs, media_key)
@@ -828,7 +895,7 @@ class Template(ProcessorMixin):
                 if num_new_tags > 0:
                     inputs.messages[0]['content'] = media_tag * num_new_tags + inputs.messages[0]['content']
                 elif num_new_tags < 0:
-                    logger.warning(
+                    get_logger().warning(
                         f'num_media: {num_media}, num_media_tags: {num_media_tags}, total_content: {total_content}. '
                         'We will only replace the frontmost media_tags while keeping the subsequent media_tags.')
 
