@@ -9,8 +9,10 @@ from swift.llm import PtEngine, RequestConfig
 from swift.llm.infer.protocol import InferRequest
 
 
-data_path = "output/v0-20250617-143536/val_dataset.jsonl"
+
+#data_path = "output/v0-20250617-143536/val_dataset.jsonl"
 #data_path = "code2image.jsonl"
+data_path = "code2image_4B.jsonl"
 
 def load_code2image_samples(jsonl_file="code2image.jsonl", num_samples=5):
     """
@@ -113,7 +115,7 @@ def test_reward_model():
         chosen_messages = sample['messages'].copy()
         rejected_messages = sample['messages'].copy() 
         
-        if data_path == "code2image.jsonl":
+        if data_path == "code2image.jsonl" or data_path == "code2image_4B.jsonl":
             # 处理chosen response (正样本)
             chosen_messages = replace_image_placeholders(chosen_messages, [sample.get('images')[0]])
             # 处理rejected response (负样本)
@@ -137,6 +139,9 @@ def test_reward_model():
         
         # 显示结果并比较分数
         scores = {}
+        # 创建用于保存到jsonl的数据列表
+        jsonl_records = []
+        
         for i, (info, result) in enumerate(zip(sample_info, results)):
             sample_id = info['sample_id']
             response_type = info['type']
@@ -154,9 +159,28 @@ def test_reward_model():
                 # 存储分数用于比较
                 if sample_id not in scores:
                     scores[sample_id] = {}
-                scores[sample_id][response_type] = score 
+                scores[sample_id][response_type] = score
+                
+                # 创建jsonl记录
+                record = {
+                    "sample_id": sample_id,
+                    "type": response_type,
+                    "image_path": info['images'],
+                    "score": score
+                }
+                jsonl_records.append(record)
             else:
                 print(f"原始结果: {result}")
+        
+        # 保存分数到jsonl文件
+        output_file = "reward_scores.jsonl"
+        print(f"\n正在保存分数到文件: {output_file}")
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            for record in jsonl_records:
+                f.write(json.dumps(record, ensure_ascii=False) + '\n')
+        
+        print(f"分数已保存到: {output_file}")
         
         # 比较每个样本的终版和初版分数
         print("\n" + "=" * 60)
@@ -166,13 +190,17 @@ def test_reward_model():
         correct_count = 0
         total_count = 0
         
+        # 同时创建汇总记录
+        summary_records = []
+        
         for sample_id in sorted(scores.keys()):
             if 'chosen' in scores[sample_id] and 'rejected' in scores[sample_id]:
                 chosen_score = scores[sample_id]['chosen']
                 rejected_score = scores[sample_id]['rejected']
                 total_count += 1
                 
-                if chosen_score > rejected_score:
+                is_correct = chosen_score > rejected_score
+                if is_correct:
                     result_symbol = "✅"
                     result_text = "终版图片分数更高"
                     correct_count += 1
@@ -181,6 +209,28 @@ def test_reward_model():
                     result_text = "初版图片分数更高或相等"
                 
                 print(f"样本 {sample_id}: 终版({chosen_score:.4f}) vs 初版({rejected_score:.4f}) {result_symbol} {result_text}")
+                
+                # 创建汇总记录
+                summary_record = {
+                    "sample_id": sample_id,
+                    "chosen_score": chosen_score,
+                    "rejected_score": rejected_score,
+                    "score_difference": chosen_score - rejected_score,
+                    "is_correct": is_correct,
+                    "chosen_image": next(r['image_path'] for r in jsonl_records if r['sample_id'] == sample_id and r['type'] == 'chosen'),
+                    "rejected_image": next(r['image_path'] for r in jsonl_records if r['sample_id'] == sample_id and r['type'] == 'rejected')
+                }
+                summary_records.append(summary_record)
+        
+        # 保存汇总结果到单独的jsonl文件
+        summary_file = "reward_summary.jsonl"
+        print(f"\n正在保存汇总结果到文件: {summary_file}")
+        
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            for record in summary_records:
+                f.write(json.dumps(record, ensure_ascii=False) + '\n')
+        
+        print(f"汇总结果已保存到: {summary_file}")
         
         # 计算并显示准确率
         if total_count > 0:
@@ -190,6 +240,23 @@ def test_reward_model():
             print(f"正确预测样本数: {correct_count} (终版图片分数高于初版)")
             print(f"总样本数: {total_count}")
             print("=" * 60)
+            
+            # 保存最终统计信息
+            final_stats = {
+                "data_source": data_path,
+                "model_path": model_path,
+                "total_samples": total_count,
+                "correct_predictions": correct_count,
+                "accuracy": accuracy,
+                "scores_file": output_file,
+                "summary_file": summary_file
+            }
+            
+            stats_file = "reward_stats.json"
+            with open(stats_file, 'w', encoding='utf-8') as f:
+                json.dump(final_stats, f, ensure_ascii=False, indent=2)
+            
+            print(f"统计信息已保存到: {stats_file}")
         else:
             print("\n没有有效的样本进行准确率计算")
                 
