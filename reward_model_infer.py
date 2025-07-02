@@ -97,7 +97,7 @@ def test_reward_model():
     print(f"\n正在加载{data_path}数据...")
     try:
 
-        samples = load_code2image_samples(data_path, num_samples=100)
+        samples = load_code2image_samples(data_path, num_samples=10000)
         print(f"成功加载 {len(samples)} 个样本")
     except Exception as e:
         print(f"加载数据失败: {e}")

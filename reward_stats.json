@@ -1,0 +1,9 @@
+{
+  "data_source": "code2image_4B.jsonl",
+  "model_path": "output/v0-20250617-143536/checkpoint-83",
+  "total_samples": 1151,
+  "correct_predictions": 1036,
+  "accuracy": 90.00868809730669,
+  "scores_file": "reward_scores.jsonl",
+  "summary_file": "reward_summary.jsonl"
+}
